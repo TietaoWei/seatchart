@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>班级座位表 · 每周轮换</title>
+<style>
+  :root{
+    --row-h: 46px;
+    --row-gap: 9px;
+    --seat-w: 62px;
+    --ink: #2c3a35;
+    --muted: #8b908c;
+    --board: #2f6b5a;
+    --line: #e4dfd3;
+  }
+  *{ box-sizing: border-box; }
+  body{
+    margin: 0;
+    min-height: 100vh;
+    padding: 30px 24px 40px;
+    display: flex;
+    justify-content: center;
+    background: radial-gradient(1100px 560px at 50% -12%, #fffef9, #f2efe7);
+    font-family: "PingFang SC","Microsoft YaHei","Hiragino Sans GB",sans-serif;
+    color: var(--ink);
+  }
+  .wrap{ width: max-content; max-width: 100%; overflow-x: auto; }
+
+  header{ display: flex; align-items: center; justify-content: space-between; gap: 28px; margin-bottom: 20px; }
+  h1{ font-size: 21px; margin: 0 0 4px; letter-spacing: 1px; }
+  .sub{ font-size: 12px; color: var(--muted); letter-spacing: .5px; }
+
+  .toolbar{ display: flex; align-items: center; gap: 10px; }
+  .week{ font-size: 13px; color: var(--muted); margin-right: 6px; }
+  .week b{ font-size: 17px; color: var(--ink); }
+  .btn{
+    height: 34px; padding: 0 16px; border: 1px solid transparent; border-radius: 8px;
+    font-size: 13px; font-family: inherit; cursor: pointer;
+    background: var(--board); color: #fff;
+    box-shadow: 0 2px 6px rgba(47,107,90,.22);
+    transition: filter .15s, opacity .15s;
+  }
+  .btn:hover{ filter: brightness(1.08); }
+  .btn.ghost{ background: #fff; color: #4a5450; border-color: var(--line); box-shadow: none; }
+  .btn.ghost:hover{ background: #faf8f2; }
+  .btn:disabled{ opacity: .4; cursor: not-allowed; filter: none; }
+
+  /* ---------- 教室 ---------- */
+  .room{
+    display: grid;
+    grid-template-columns: 58px 1fr 96px;
+    grid-template-areas:
+      ".    board ."
+      "rail groups side";
+    gap: 14px 12px;
+  }
+
+  .blackboard{
+    grid-area: board;
+    height: 54px; border-radius: 10px;
+    background: linear-gradient(180deg,#357563,#2b6152);
+    color: #ecf5ef; display: grid; place-items: center;
+    font-size: 17px; letter-spacing: 10px; text-indent: 10px;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.12), 0 4px 10px rgba(43,97,82,.18);
+  }
+
+  .rail{ grid-area: rail; }
+  .rail-item{
+    height: var(--row-h); margin-bottom: var(--row-gap);
+    display: grid; place-items: center;
+    font-size: 11px; color: var(--muted); letter-spacing: .5px;
+  }
+  .rail-spacer{ height: 30px; margin-bottom: 10px; }
+
+  .groups{ grid-area: groups; display: flex; gap: 22px; align-items: flex-start; }
+  .group{ display: flex; flex-direction: column; }
+  .group-title{
+    height: 30px; margin-bottom: 10px;
+    display: grid; place-items: center;
+    font-size: 12px; color: #5b6b64; letter-spacing: 1px;
+    border-bottom: 2px solid #d9d4c6;
+  }
+  .group-title.door{ color: #a06a3c; border-bottom-color: #e0c9a8; }
+
+  .desk-row{ height: var(--row-h); margin-bottom: var(--row-gap); }
+  .desk{
+    height: 100%; width: 140px; display: flex; justify-content: flex-start; gap: 6px; padding: 5px;
+    background: #fff; border-radius: 10px;
+    box-shadow: 0 1px 2px rgba(60,60,50,.09);
+  }
+  .seat{
+    width: var(--seat-w); padding: 0 4px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px; background: #eef3f0;
+    font-size: 14px; font-weight: 600; letter-spacing: .5px;
+    color: #33564a;
+    font-variant-numeric: tabular-nums;
+    cursor: text; outline: none;
+    white-space: nowrap; overflow: hidden;
+    transition: background .15s, box-shadow .15s;
+  }
+  .seat:hover{ background: #e5ede8; }
+  .seat:focus{ background: #fff; box-shadow: inset 0 0 0 2px rgba(47,107,90,.5); }
+  .seat.tight{ font-size: 10.5px; letter-spacing: 0; }
+
+  .side{
+    grid-area: side; display: flex; flex-direction: column;
+    border-left: 2px solid #ded8c9; padding-left: 12px;
+    font-size: 11px; color: var(--muted); letter-spacing: 2px;
+  }
+  .side .pane{
+    flex: 1; margin-bottom: 8px; border-radius: 6px;
+    background: linear-gradient(180deg,#eaf3f7,#dceaf1);
+    border: 1px solid #cfdfe6;
+    display: grid; place-items: center;
+  }
+  .door-pane{
+    height: 96px; flex: none; margin-top: 10px; margin-bottom: 0;
+    border-radius: 6px 6px 2px 2px;
+    background: linear-gradient(180deg,#e7d7bd,#d8c3a1);
+    border: 1px solid #cdb894;
+    display: grid; place-items: center; color: #8a6a3d;
+  }
+
+  /* ---------- 规则 ---------- */
+  .rules{
+    margin-top: 22px; padding: 14px 18px;
+    background: rgba(255,255,255,.72); border: 1px solid var(--line); border-radius: 10px;
+    font-size: 12.5px; line-height: 1.85; color: #4e5854;
+  }
+  .rules b{ color: var(--ink); letter-spacing: .5px; }
+  .rules ul{ margin: 6px 0 0; padding-left: 18px; }
+  .rules li{ margin: 1px 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>班级座位表</h1>
+      <div class="sub">点击任一格子可直接输入名字 · 右侧为门窗 · 面朝黑板</div>
+    </div>
+    <div class="toolbar">
+      <span class="week">第 <b id="weekNum">1</b> 周</span>
+      <button class="btn ghost" id="prev">上一周</button>
+      <button class="btn ghost" id="reset">重置</button>
+      <button class="btn ghost" id="save">保存</button>
+      <button class="btn" id="next">下一周</button>
+    </div>
+  </header>
+
+  <div class="room">
+    <div class="blackboard">黑　板</div>
+    <div class="rail" id="rail"></div>
+    <div class="groups" id="groups"></div>
+    <div class="side">
+      <div class="pane">窗</div>
+      <div class="pane">窗</div>
+      <div class="door-pane">门</div>
+    </div>
+  </div>
+
+  <section class="rules">
+    <b>轮换规则</b>
+    <ul>
+      <li>四个大组，每组每排同桌两人；左侧三组各 6 排，最右侧靠门一组 5 排。</li>
+      <li>每周全班向左后方挪一格：组号 −1、排号 +1；第一组挪出后落到第四组（门边那组）。</li>
+      <li>排号超过所在组的排数时，回到该组第 1 排。</li>
+      <li>最左组第 5 排（倒数第二排）下一周坐「右侧数第二组」第 1 排——因为靠门那组只有 5 排，没有第 6 排。</li>
+    </ul>
+  </section>
+</div>
+
+<script>
+  const ROWS = [6, 6, 6, 5];                       // 第一组~第四组（从左到右）
+  const GROUP_NAMES = ['第一组', '第二组', '第三组', '第四组'];
+  const rowsOf = g => ROWS[g - 1];
+
+  // 每周的座位映射：向左后方挪一格
+  function nextStation(g, r) {
+    // 最左组倒数第二排（第5排）：右侧数第二组第1排（靠门组没有第6排）
+    if (g === 1 && r === rowsOf(1) - 1) return { g: 3, r: 1 };
+
+    const dg = g === 1 ? 4 : g - 1;                // 第一组向左挪出，落到第四组
+    const dr = r + 1 > rowsOf(dg) ? 1 : r + 1;     // 排号超出则回到第1排
+    return { g: dg, r: dr };
+  }
+
+  // 初始座位：按组、按排依次编号（每组一排两人）
+  // 第一组第 4 排靠右的座位无人：沈泽闻单独一桌
+  function initialSeats() {
+    const seats = {};
+    let id = 1;
+    for (let g = 1; g <= 4; g++) {
+      for (let r = 1; r <= rowsOf(g); r++) {
+        if (g === 1 && r === 4) { seats[g + '-' + r] = [id++]; continue; }
+        seats[g + '-' + r] = [id++, id++];
+      }
+    }
+    return seats;
+  }
+
+  function rotate(seats) {
+    const next = {};
+    for (const key in seats) {
+      const [g, r] = key.split('-').map(Number);
+      const to = nextStation(g, r);
+      next[to.g + '-' + to.r] = seats[key];
+    }
+    return next;
+  }
+
+  // 默认名单：按座位顺序编号（第一组第1排左→右，依次到第四组第5排）
+  // 已与《高二（2）班名单》逐一核对
+  const DEFAULT_NAMES = {
+    1: '刘一超', 2: '王启丞', 3: '李子尧', 4: '王沐涵', 5: '杨承瑜', 6: '王腾', 7: '沈泽闻',
+    8: '肖亦飞', 9: '王代恒', 10: '王凯琳', 11: '李晨瑜', 12: '倪璇衡', 13: '何文尊', 14: '池平禾',
+    15: '沈义钧', 16: '薛有杰', 17: '赵奕辰', 18: '滕飞', 19: '高睿', 20: '徐稚斐', 21: '徐子欣',
+    22: '虞轩', 23: '闵文杰', 24: '孔家祥', 25: '李冠呈', 26: '衡雨晨', 27: '李玲瑞',
+    28: '李雨泽', 29: '王子涵', 30: '徐一鎏', 31: '杨庸', 32: '王梓潼', 33: '张恒瑞',
+    34: '王泽夏', 35: '魏雨欣', 36: '马梦瑶', 37: '郭屹涵', 38: '蔡佳桐', 39: '默林萱',
+    40: '张子立', 41: '蔡欣佟', 42: '陈禹帆', 43: '何彦锜', 44: '张睿祺', 45: '陈昳萱'
+  };
+  const START_WEEK = 1;                             // 打开页面时显示的周次
+
+  // 取第 w 周的座位分布
+  function seatsAt(w) {
+    let s = initialSeats();
+    for (let i = 1; i < w; i++) s = rotate(s);
+    return s;
+  }
+
+  let week = START_WEEK;
+  let seats = seatsAt(START_WEEK);
+
+  const names = Object.assign({}, DEFAULT_NAMES);   // 学生编号 -> 姓名
+  const labelOf = id => names[id] || String(id).padStart(2, '0');
+  const isTight = id => (names[id] || '').length >= 5;
+
+  // ---------- 保存 / 恢复（localStorage） ----------
+  const SAVE_KEY = 'seat-chart-state-v2';
+
+  function saveState() {
+    localStorage.setItem(SAVE_KEY, JSON.stringify({ week, seats, names }));
+  }
+
+  function loadState() {
+    try {
+      const data = JSON.parse(localStorage.getItem(SAVE_KEY));
+      if (!data || !data.seats) return;
+      if (Object.keys(data.seats).length !== ROWS.reduce((a, b) => a + b, 0)) return;
+      week = data.week || START_WEEK;
+      seats = data.seats;
+      Object.assign(names, data.names || {});
+    } catch { /* 存档损坏就忽略 */ }
+  }
+
+  // 把格子改成可编辑：失焦后保存，清空则恢复学号
+  function saveSeat(seat, id) {
+    const text = seat.textContent.trim();
+    if (text) names[id] = text;
+    else delete names[id];
+  }
+
+  function bindSeat(seat, id) {
+    seat.addEventListener('focus', () => {
+      // 聚焦时全选，直接输入即可覆盖原内容
+      requestAnimationFrame(() => {
+        const range = document.createRange();
+        range.selectNodeContents(seat);
+        const sel = window.getSelection();
+        sel.removeAllRanges();
+        sel.addRange(range);
+      });
+    });
+    seat.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); seat.blur(); }
+    });
+    seat.addEventListener('input', () => {
+      saveSeat(seat, id);
+      seat.classList.toggle('tight', seat.textContent.trim().length >= 5);
+    });
+    seat.addEventListener('blur', () => {
+      saveSeat(seat, id);
+      seat.textContent = labelOf(id);
+      seat.classList.toggle('tight', isTight(id));
+    });
+  }
+
+  const groupsEl = document.getElementById('groups');
+  const railEl = document.getElementById('rail');
+  const weekEl = document.getElementById('weekNum');
+  const maxRows = Math.max(...ROWS);
+
+  railEl.innerHTML = '<div class="rail-spacer"></div>' +
+    Array.from({ length: maxRows }, (_, i) => '<div class="rail-item">第' + (i + 1) + '排</div>').join('');
+
+  function render() {
+    groupsEl.innerHTML = '';
+    for (let g = 1; g <= 4; g++) {
+      const col = document.createElement('div');
+      col.className = 'group';
+
+      const title = document.createElement('div');
+      title.className = 'group-title' + (rowsOf(g) === 5 ? ' door' : '');
+      title.textContent = GROUP_NAMES[g - 1] + (rowsOf(g) === 5 ? '（靠门）' : '');
+      col.appendChild(title);
+
+      for (let r = 1; r <= rowsOf(g); r++) {
+        const rowEl = document.createElement('div');
+        rowEl.className = 'desk-row';
+
+        const desk = document.createElement('div');
+        desk.className = 'desk';
+        seats[g + '-' + r].forEach(id => {
+          const seat = document.createElement('div');
+          seat.className = 'seat' + (isTight(id) ? ' tight' : '');
+          seat.contentEditable = 'true';
+          seat.spellcheck = false;
+          seat.textContent = labelOf(id);
+          bindSeat(seat, id);
+          desk.appendChild(seat);
+        });
+
+        rowEl.appendChild(desk);
+        col.appendChild(rowEl);
+      }
+      groupsEl.appendChild(col);
+    }
+    weekEl.textContent = week;
+    document.getElementById('prev').disabled = week === 1;
+  }
+
+  document.getElementById('next').onclick = () => { seats = rotate(seats); week++; render(); };
+  document.getElementById('prev').onclick = () => { week--; seats = seatsAt(week); render(); };
+  document.getElementById('reset').onclick = () => { week = START_WEEK; seats = seatsAt(week); render(); };
+
+  document.getElementById('save').onclick = () => {
+    saveState();
+    const btn = document.getElementById('save');
+    btn.textContent = '已保存';
+    btn.disabled = true;
+    setTimeout(() => { btn.textContent = '保存'; btn.disabled = false; }, 1200);
+  };
+
+  loadState();
+  render();
+</script>
+</body>
+</html>
